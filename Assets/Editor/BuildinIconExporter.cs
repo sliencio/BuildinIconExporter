@@ -21,101 +21,122 @@ namespace EditorTools
         [MenuItem("Tools/Generate README.md", priority = -1000)]
         private static void GenerateReadme()
         {
-            EditorUtility.DisplayProgressBar("Generate README.md", "Generating...", 0.0f);
             try
             {
-                var editorAssetBundle = GetEditorAssetBundle();
-                var iconsPath = GetIconsPath();
-                var readmeContents = new StringBuilder();
-
-                readmeContents.AppendLine($"Unity Editor Built-in Icons");
-                readmeContents.AppendLine($"==============================");
-                readmeContents.AppendLine($"Unity version: {Application.unityVersion}");
-                readmeContents.AppendLine($"Icons can load using `EditorGUIUtility.IconContent(\"xxxx\").image`");
-
-
-                Dictionary<string, IconGroup> iconDic = new Dictionary<string, IconGroup>();
-                var desktopPath = GetDesktopPath();
-                var pathRoot = Path.Combine(desktopPath, "UnityBuildinIcon");
-
-                var assetNames = EnumerateIcons(editorAssetBundle, iconsPath).ToArray();
-                for (var i = 0; i < assetNames.Length; i++)
-                {
-                    var assetName = assetNames[i];
-                    var icon = editorAssetBundle.LoadAsset<Texture2D>(assetName);
-                    if (icon == null)
-                        continue;
-
-                    EditorUtility.DisplayProgressBar("Generate README.md",
-                        $"Generating... ({i + 1}/{assetNames.Length})",
-                        (float)i / assetNames.Length);
-
-                    var readableTexture = new Texture2D(icon.width, icon.height, icon.format, icon.mipmapCount > 1);
-
-                    Graphics.CopyTexture(icon, readableTexture);
-
-                    var folderPath =
-                        Path.GetDirectoryName(Path.Combine(pathRoot, "icons", assetName.Substring(iconsPath.Length)));
-                    var relativeFolderPath =
-                        Path.GetDirectoryName(Path.Combine("icons", assetName.Substring(iconsPath.Length)));
-                    if (Directory.Exists(folderPath) == false)
-                        Directory.CreateDirectory(folderPath);
-
-                    var iconPath = Path.Combine(folderPath, icon.name + ".png");
-
-                    Texture2D srcTex = readableTexture; // 原始贴图
-                    Texture2D readableTex = new Texture2D(srcTex.width, srcTex.height, TextureFormat.RGBA32, false);
-                    readableTex.SetPixels(srcTex.GetPixels());
-                    readableTex.Apply();
-
-                    var png = readableTex.EncodeToPNG();
-                    File.WriteAllBytes(iconPath, png);
-
-                    // 先移除分辨率后缀
-                    var normalIconName = Regex.Replace(icon.name, @"@\d+x$", "");
-                    ;
-
-                    if (!iconDic.ContainsKey(normalIconName))
-                    {
-                        iconDic.Add(normalIconName, new IconGroup());
-                    }
-
-                    iconDic[normalIconName].IconNameList.Add(icon.name);
-                    iconDic[normalIconName].IconPathList.Add(relativeFolderPath);
-                }
-
-                readmeContents.AppendLine($"Icon Count: {iconDic.Count}");
-                readmeContents.AppendLine();
-                readmeContents.AppendLine($"| Icon | Name |");
-                readmeContents.AppendLine($"|------|------|");
-
-                foreach (var pair in iconDic.Values)
-                {
-                    var iconPaths = "";
-                    var iconNames = "";
-                    for (int i = 0; i < pair.IconNameList.Count; i++)
-                    {
-                        var tempIconPath = pair.IconPathList[i].Replace(" ", "%20").Replace('\\', '/');
-                        var tempIconName = pair.IconNameList[i];
-                        var escapedUrl = $"{tempIconPath}/{tempIconName}.png";
-                        iconPaths += $" ![]({escapedUrl})";
-                        if (!string.IsNullOrEmpty(iconNames))
-                        {
-                            iconNames += "<br/>";
-                        }
-
-                        iconNames += $"`{tempIconName}`";
-                    }
-
-                    readmeContents.AppendLine($"|{iconPaths} | {iconNames}|");
-                }
-
-                File.WriteAllText(pathRoot + "/README.md", readmeContents.ToString());
+                EditorUtility.DisplayProgressBar("Generate README.md", "Generating...", 0.0f);
+                var data = GetGenerateData();
+                DoGenerateReadme(data);
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine(e);
+                throw;
             }
             finally
             {
                 EditorUtility.ClearProgressBar();
             }
+        }
+
+        private static Dictionary<string, IconGroup> GetGenerateData()
+        {
+            Dictionary<string, IconGroup> iconDic = new Dictionary<string, IconGroup>();
+            var editorAssetBundle = GetEditorAssetBundle();
+            var iconsPath = GetIconsPath();
+
+
+            var desktopPath = GetDesktopPath();
+            var pathRoot = Path.Combine(desktopPath, "UnityBuildinIcon");
+
+            var assetNames = EnumerateIcons(editorAssetBundle, iconsPath).ToArray();
+            for (var i = 0; i < assetNames.Length; i++)
+            {
+                var assetName = assetNames[i];
+                var icon = editorAssetBundle.LoadAsset<Texture2D>(assetName);
+                if (icon == null)
+                    continue;
+
+                EditorUtility.DisplayProgressBar("Generate README.md",
+                    $"Generating... ({i + 1}/{assetNames.Length})",
+                    (float)i / assetNames.Length);
+
+                var readableTexture = new Texture2D(icon.width, icon.height, icon.format, icon.mipmapCount > 1);
+
+                Graphics.CopyTexture(icon, readableTexture);
+
+                var folderPath =
+                    Path.GetDirectoryName(Path.Combine(pathRoot, "icons", assetName.Substring(iconsPath.Length)));
+                var relativeFolderPath =
+                    Path.GetDirectoryName(Path.Combine("icons", assetName.Substring(iconsPath.Length)));
+                if (Directory.Exists(folderPath) == false)
+                    Directory.CreateDirectory(folderPath);
+
+                var iconPath = Path.Combine(folderPath, icon.name + ".png");
+
+                Texture2D srcTex = readableTexture; // 原始贴图
+                Texture2D readableTex = new Texture2D(srcTex.width, srcTex.height, TextureFormat.RGBA32, false);
+                readableTex.SetPixels(srcTex.GetPixels());
+                readableTex.Apply();
+
+                var png = readableTex.EncodeToPNG();
+                File.WriteAllBytes(iconPath, png);
+
+                // 先移除分辨率后缀
+                var normalIconName = Regex.Replace(icon.name, @"@\d+x$", "");
+                ;
+
+                if (!iconDic.ContainsKey(normalIconName))
+                {
+                    iconDic.Add(normalIconName, new IconGroup());
+                }
+
+                iconDic[normalIconName].IconNameList.Add(icon.name);
+                iconDic[normalIconName].IconPathList.Add(relativeFolderPath);
+            }
+
+            return iconDic;
+        }
+
+
+        private static void DoGenerateReadme(Dictionary<string, IconGroup> iconDic)
+        {
+            var readmeContents = new StringBuilder();
+
+            readmeContents.AppendLine($"Unity Editor Built-in Icons");
+            readmeContents.AppendLine($"==============================");
+            readmeContents.AppendLine($"Unity version: {Application.unityVersion}");
+            readmeContents.AppendLine($"Icons can load using `EditorGUIUtility.IconContent(\"xxxx\").image`");
+
+
+            readmeContents.AppendLine($"Icon Count: {iconDic.Count}");
+            readmeContents.AppendLine();
+            readmeContents.AppendLine($"| Icon | Name |");
+            readmeContents.AppendLine($"|------|------|");
+
+
+            foreach (var pair in iconDic.Values)
+            {
+                var iconPaths = "";
+                var iconNames = "";
+                for (int i = 0; i < pair.IconNameList.Count; i++)
+                {
+                    var tempIconPath = pair.IconPathList[i].Replace(" ", "%20").Replace('\\', '/');
+                    var tempIconName = pair.IconNameList[i];
+                    var escapedUrl = $"{tempIconPath}/{tempIconName}.png";
+                    iconPaths += $" ![]({escapedUrl})";
+                    if (!string.IsNullOrEmpty(iconNames))
+                    {
+                        iconNames += "<br/>";
+                    }
+
+                    iconNames += $"`{tempIconName}`";
+                }
+
+                readmeContents.AppendLine($"|{iconPaths} | {iconNames}|");
+            }
+
+            var pathRoot = Path.Combine(GetDesktopPath(), "UnityBuildinIcon");
+            File.WriteAllText(pathRoot + "/README.md", readmeContents.ToString());
         }
 
         private static IEnumerable<string> EnumerateIcons(AssetBundle editorAssetBundle, string iconsPath)
